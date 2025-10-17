@@ -116,6 +116,171 @@ While it probably can answer the whole lab for you, that would defeat the entire
 using Pkg
 lab_dir = dirname(@__FILE__)
 Pkg.activate(lab_dir)
-# Pkg.instantiate() # uncomment this the first time you run the lab to install packages, then comment it back
+#Pkg.instantiate() # uncomment this the first time you run the lab to install packages, then comment it back
+```
+
+Using block: 
+```{julia}
+using YAXArrays
+using YAXArrays: YAXArrays as YAX
+
+```
+
+
+
+## YAXArray getting started
+Create a simple, random, 2x3 array: 
+
+```{julia}
+a = YAXArray(rand(2,3))
+
+```
+
+Make a more complex, 4-dimenstional array that might actually represent something.  In this case, longitude (x), latitude (y), time, and metrics, such as temperature and precipitations
+
+```{julia}
+# Establish the dimentsions and names of the values of the array
+axlist = (
+    YAX.time(range(1, 20, length=20)),
+    lon(range(1, 10, length=10)),
+    lat(range(1, 5, length=15)),
+    Variables(["temperature", "precipitation"])
+)
+
+# Random data to fill our array, of the same size/shape as our array
+data = rand(20, 10, 15, 2)
+
+# Dictionary that holds our metadata/dev informations about the array
+props = Dict(
+    "origin" => "YAXArrays.jl example",
+    "x" => "longitude",
+    "y" => "latitude",
+);
+
+#Display our array
+a2 = YAXArray(axlist, data, props)
+```
+
+Get the temperature of our array at the first point in time: 
+
+```{julia}
+
+a2[Variables=At("temperature"), time=1].data
+
+```
+
+## Dimensional Data 
+
+### Selecting data 
+
+Using block: 
+
+```{julia}
+
+using NetCDF
+using Downloads: download
+
+```
+
+Download and open data: 
+
+```{julia}
+
+#path = download("https://archive.unidata.ucar.edu/software/netcdf/examples/tos_O1_2001-2002.nc", "example.nc")
+if !isfile("example.nc"); download(url, "example.nc"); end
+ds = open_dataset(path)
+
+```
+
+Get sea surface temperature of the dataset: 
+
+```{julia}
+
+tos = ds.tos
+# OR
+tos = ds.cubes[:tos]
+
+```
+
+Selecting elements: 
+
+```{julia}
+
+#Selecting elements in a few different ways: 
+
+#Using positive integer indexing: 
+tos[lon = 1, lat = 1]
+
+#Using name indexing: 
+tos[lon = At(1), lat = At(-79.5)]
+
+#Using time stamps: 
+#import Pkg; Pkg.add("CFTime")
+using CFTime
+time1 = DateTime360Day(2001,01,16)
+tos[time = At(time1)]
+
+```
+
+Select ranges 
+
+```{julia}
+
+#Using positive integer indexing 
+tos[lon = 1:10, lat = 1:10]
+
+#Using name indexing 
+tos[lon = At(1.0:2:19), lat = At(-79.5:1:-70.5)]
+
+#Obtain values within tolerances: 
+tos[lon = At(1:10; atol = 1)]
+
+```
+
+Obtain a closed interval: 
+
+```{julia}
+
+tos[lon = 90 .. 180]
+
+```
+
+Other methods of obtaining open and closed intervals: 
+
+```{julia}
+#import Pkg; Pkg.add("IntervalSets")
+using IntervalSets
+
+```
+
+
+```{julia}
+
+tos[lon = OpenInterval(90, 180)]
+
+tos[lon = ClosedInterval(90, 180)]
+
+tos[lon =Interval{:open,:closed}(90,180)]
+
+tos[lon =Interval{:closed,:open}(90,180)]
+
+```
+
+Select an entire dimension: 
+
+```{julia}
+
+collect(tos.lat)
+
+```
+
+Lookup values in our dimension: 
+
+```{julia}
+
+lookup(tos, :lon)
+#OR
+tos.lon.val
+
 ```
 
