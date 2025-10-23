@@ -284,3 +284,100 @@ tos.lon.val
 
 ```
 
+
+## Plotting Maps 
+
+### Import Packages 
+
+```{julia}
+using Zarr, YAXArrays, Dates
+using DimensionalData
+using CairoMakie, GeoMakie
+using CairoMakie.GeometryBasics
+
+store ="gs://cmip6/CMIP6/ScenarioMIP/DKRZ/MPI-ESM1-2-HR/ssp585/r1i1p1f1/3hr/tas/gn/v20190710/"
+
+```
+
+```{julia}
+
+g = open_dataset(zopen(store, consolidated=true))
+c = g["tas"];
+
+#Subset first timestep
+ct1_slice = c[time = Near(Date("2015-01-01"))];
+
+
+#Use lookup to get axis values 
+lon_d = lookup(ct1_slice, :lon)
+lat_d = lookup(ct1_slice, :lat)
+data_d = ct1_slice.data[:,:];
+
+```
+
+
+### Heatmap plot 
+
+```{julia}
+CairoMakie.activate!()
+
+fig, ax, plt = heatmap(ct1_slice; colormap = :seaborn_icefire_gradient,
+    axis = (; aspect=DataAspect()),
+    figure = (; size = (1200,600), fontsize=24))
+fig
+
+```
+
+
+### Wintri Projection 
+
+```{julia}
+δlon = (lon_d[2] - lon_d[1])/2
+nlon = lon_d .- 180 .+ δlon
+ndata = circshift(data_d, (192,1))
+
+
+
+fig = Figure(;size=(1200,600))
+ax = GeoAxis(fig[1,1])
+surface!(ax, nlon, lat_d, ndata; colormap = :seaborn_icefire_gradient, shading=false)
+cl=lines!(ax, GeoMakie.coastlines(), color = :white, linewidth=0.85)
+translate!(cl, 0, 0, 1000)
+fig
+
+```
+
+### Moll Projection
+
+```{julia}
+
+fig = Figure(; size=(1200,600))
+ax = GeoAxis(fig[1,1]; dest = "+proj=moll")
+surface!(ax, nlon, lat_d, ndata; colormap = :seaborn_icefire_gradient, shading=false)
+cl=lines!(ax, GeoMakie.coastlines(), color = :white, linewidth=0.85)
+translate!(cl, 0, 0, 1000)
+fig
+
+```
+
+
+### 3D Sphere Plot 
+
+```{julia}
+
+using CairoMakie
+using CairoMakie.GeometryBasics
+CairoMakie.activate!()
+
+ds = replace(ndata, missing =>NaN)
+sphere = uv_normal_mesh(Tesselation(Sphere(Point3f(0), 1), 128))
+
+fig = Figure(backgroundcolor=:grey25, size=(500,500))
+ax = LScene(fig[1,1], show_axis=false)
+mesh!(ax, sphere; color = ds'[end:-1:1,:], shading=false,
+    colormap = :seaborn_icefire_gradient)
+zoom!(ax.scene, cameracontrols(ax.scene), 0.5)
+rotate!(ax.scene, 2.5)
+fig
+
+```
