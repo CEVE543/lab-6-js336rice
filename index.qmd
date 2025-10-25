@@ -313,6 +313,9 @@ lon_d = lookup(ct1_slice, :lon)
 lat_d = lookup(ct1_slice, :lat)
 data_d = ct1_slice.data[:,:];
 
+#print(lon_d)
+#print(lat_d)
+
 ```
 
 
@@ -381,3 +384,100 @@ rotate!(ax.scene, 2.5)
 fig
 
 ```
+
+## Part 5: Make our own plots 
+
+### Select a rectangle 
+
+Just for fun, let's select the Great Lakes Region of North America 
+```{julia}
+data_rectangle = ct1_slice.data[265:290,40:50];
+
+
+fig, ax, plt = heatmap(data_rectangle; colormap = :seaborn_icefire_gradient,
+    axis = (; aspect=DataAspect()),
+    figure = (; size = (1200,600), fontsize=24))
+fig
+```
+
+### Compute average TAS over our region 
+
+Get TAS in our region for all time: 
+```{julia}
+
+#dims(c)
+#Get the TAS across all time for our region:
+#tas_region_over_time = c[265:290,40:50,:];
+#use @view instead of the usual method to speed things up:
+#tas_region_lazy_subset = @view c[265:290, 40:50, :]
+
+```
+
+
+Compute average TAS: 
+```{julia}
+#using YAXArrays
+#using Statistics
+#This is how the 'GEM' recommended I calculate the mean across the time series in a fast, efficient way.  The explanation it gave seemed "credible"
+
+#tas_mean = mapreduce(identity, mean, tas_region_lazy_subset)
+
+#calculate mean:
+#tas_mean = mean(tas_region_lazy_subset)
+
+```
+
+
+### Fix for the data download issue: 
+
+```{julia}
+using Zarr, YAXArrays, Dates, NCDatasets, Statistics, DimensionalData
+
+# 1. Define remote store and the local file path for our *region*
+remote_store_url = "gs://cmip6/CMIP6/ScenarioMIP/DKRZ/MPI-ESM1-2-HR/ssp585/r1i1p1f1/3hr/tas/gn/v20190710/"
+local_nc_path = "tas_region_GreatLakes.nc" # We will save our slice here as NetCDF but could use a different back end
+
+
+# 2. Check if the local file exists. If not, create it.
+if !isfile(local_nc_path)
+    println("Local file not found. Downloading region from GCS...")
+
+    # the "gem" helped me with some fixes here... although at the time of writing this I think I'm still understanding the intricaciies of how the "do" function works, and why the original threw an error.
+    #Follow-up on previous comment: I think I get it now.  I think it's as simple as the "do" block not being supported when the string is a url, and the "open_dataset" command had to happen on its own line as a result. 
+    # 1. Open the remote Zarr store. zopen returns a ZGroup object.
+    # We remove the 'do' block because zopen doesn't support it for a URL string input.
+    z_group = zopen(remote_store_url, consolidated=true) 
+
+    # 2. Convert the Zarr group 'z_group' into a YAXArray dataset 'g'
+    g = open_dataset(z_group) 
+
+    # Get the 'tas' variable (still lazy)
+    tas = g["tas"]
+
+    # Define the regional slice (still lazy)
+    region_remote = tas[lon = 265 .. 290, lat = 40 .. 50]
+
+    # This line triggers the download and saves the result
+    println("Saving region to: $local_nc_path")
+    savecube(region_remote, local_nc_path, driver=:netcdf)
+    # No explicit close is needed for the remote Zarr store when just reading.
+
+    println("Local region file created.")
+else
+
+    println("Local file $local_nc_path already exists. Skipping download.")
+end
+
+# 3. Now, perform the analysis on the *local file*
+# We use another 'do' block to open/close the local NetCDF safely
+println("Calculating mean from local file...")
+avg_tas = open_dataset(local_nc_path) do region
+    # This read is now from local disk, so it's very fast
+    mean(skipmissing(region))
+end
+
+println("Average TAS for the region: $avg_tas")
+
+```
+
+
