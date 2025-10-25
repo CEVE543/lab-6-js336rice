@@ -468,16 +468,39 @@ else
     println("Local file $local_nc_path already exists. Skipping download.")
 end
 
-# 3. Now, perform the analysis on the *local file*
-# We use another 'do' block to open/close the local NetCDF safely
-println("Calculating mean from local file...")
-avg_tas = open_dataset(local_nc_path) do region
-    # This read is now from local disk, so it's very fast
-    mean(skipmissing(region))
-end
-
-println("Average TAS for the region: $avg_tas")
-#Test
 ```
 
-test - test
+```{julia}
+
+# 3. Now, perform the analysis on the *local file*
+println("Calculating mean from local file...")
+
+# Open the dataset (file handle may remain open until the variable is GC'd)
+region = open_dataset(local_nc_path) 
+
+
+
+#Select tas variable 
+tas_array = region["tas"]
+
+
+
+#Get the mean from each time step in a time series - this was semi-ai assisted, it gave me several wrong and weirdly complicated functions at first 
+#mean_timeseries = mean(tas_array)
+
+# 1. Define the dimensions you want to average over (the spatial dimensions)
+spatial_dims = ("lat", "lon")
+
+# 2. Apply the mean function over those dimensions
+mean_time_series = mapslices(mean, tas_array, dims=spatial_dims)
+
+```
+
+```{julia}
+# A way to display our results from the GEM: 
+println("The mean time series is a YAXArray with dimensions:")
+#It also gave the wrong function here.  I think it was pulling from standard julia methods of displaying dims, instead of yaxarray?  But I'm not sure. 
+println(dims(mean_time_series))
+println(dims(tas_array))
+
+```
