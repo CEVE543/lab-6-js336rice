@@ -563,5 +563,5 @@ println(bottom_vals)
 println(bottom_times)
 ```
 
-### Plto the hottest and coldest time periods 
+### Plot the hottest and coldest time periods 
 
