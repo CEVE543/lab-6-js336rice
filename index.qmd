@@ -470,6 +470,8 @@ end
 
 ```
 
+### Calculate mean for each timestep:
+
 ```{julia}
 
 # 3. Now, perform the analysis on the *local file*
@@ -490,9 +492,11 @@ tas_array = region["tas"]
 
 # 1. Define the dimensions you want to average over (the spatial dimensions)
 spatial_dims = ("lat", "lon")
+#spatial_dims = (:lat, :lon)
 
 # 2. Apply the mean function over those dimensions
 mean_time_series = mapslices(mean, tas_array, dims=spatial_dims)
+
 
 ```
 
@@ -503,4 +507,48 @@ println("The mean time series is a YAXArray with dimensions:")
 println(dims(mean_time_series))
 println(dims(tas_array))
 
+```
+
+### Plot the time series: 
+
+
+```{julia}
+#using CairoMakie 
+
+# Extract the data 
+time_axis = collect(lookup(mean_time_series, :time))
+#tas_values = collect(mean_time_series)
+#Drop no longer used dimensions
+tas_values = dropdims(collect(mean_time_series); dims=(1,2)) |> vec
+# print(shape(time_axis))
+# println(dims(tas_values))
+
+# Create the figure and axis
+f = Figure()
+ax = Axis(f[1, 1], title="Time Series of Spatially Averaged TAS", xlabel="Time", ylabel="Mean TAS Value")
+
+# Plot the line
+
+
+lines!(ax, time_axis, tas_values, label="Mean TAS")
+
+# Display the figure (if not in an environment that automatically displays)
+display(f)
+
+```
+
+### Find the three hottest time periods in our data 
+```{julia}
+
+#println(dims(mean_time_series))
+
+#println(typeof(tas_values))
+
+top_idx = partialsortperm(tas_values, 1:3; rev=true)  # indices of 3 largest values
+
+top_vals = tas_values[top_idx]
+top_times = time_axis[top_idx]
+
+println(top_vals)
+println(top_times)
 ```
